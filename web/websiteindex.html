@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miitalkmo: TTS Generator</title>
+    <!-- Google Fonts: Roboto -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bgMain: '#EBEBEB',
+                        miitoCyan: '#019ABE',
+                        miitoOrange: '#FF9922',
+                        miitoShadow: '#884400',
+                        miitoBorder: '#666666'
+                    },
+                    fontFamily: {
+                        sans: ['Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #EBEBEB;
+            font-family: 'Roboto', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Miitomo Flat Custom Action Buttons with Hard Shadow */
+        .miito-btn {
+            background-color: #FF9922;
+            color: #FFFFFF;
+            font-weight: 700;
+            border-radius: 0.75rem;
+            border: 2.5px solid #4A3000;
+            box-shadow: 0px 5px 0px #884400;
+            transition: all 0.08s ease-in-out;
+            cursor: pointer;
+            text-align: center;
+        }
+        .miito-btn:hover {
+            background-color: #FFAA33;
+        }
+        .miito-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0px 1px 0px #884400;
+        }
+
+        /* Pill Header Badges */
+        .miito-pill {
+            background-color: #FFFFFF;
+            border: 3px solid #777777;
+            color: #666666;
+            font-weight: 700;
+            border-radius: 9999px;
+            padding: 0.35rem 1.5rem;
+            display: inline-block;
+            font-size: 1.1rem;
+        }
+
+        /* Input Controls */
+        .miito-input-box {
+            background-color: #FFFFFF;
+            border: 3px solid #777777;
+            border-radius: 1.25rem;
+            color: #444444;
+            font-weight: 500;
+            outline: none;
+        }
+        .miito-input-box:focus {
+            border-color: #019ABE;
+        }
+
+        /* Intonation Buttons (No Shadow per spec) */
+        .intonation-btn {
+            background-color: #FFFFFF;
+            color: #888888;
+            font-weight: 900;
+            border: 3px solid #FFFFFF;
+            border-radius: 0.5rem;
+            width: 2.8rem;
+            height: 2.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .intonation-btn.selected {
+            background-color: #019ABE !important;
+            color: #FFFFFF !important;
+            border-color: #019ABE !important;
+        }
+
+        /* Radar Chart Canvas Interaction */
+        #radarCanvas {
+            touch-action: none;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4 md:p-8">
+
+    <!-- Main Container -->
+    <div class="w-full max-w-6xl relative bg-[#EBEBEB] rounded-2xl p-4 md:p-8">
+
+        <!-- Top Header & Subtitle -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6">
+            <div class="text-gray-500 font-bold text-lg md:text-xl tracking-wide mb-2 md:mb-0">
+                <span id="langCount">12</span> Languages supported
+            </div>
+            <div class="flex items-baseline">
+                <h1 class="text-5xl md:text-6xl font-black text-[#019ABE] tracking-tight">Miitalkmo<span class="text-xs align-super font-normal text-[#019ABE] ml-0.5">™</span></h1>
+            </div>
+        </div>
+
+        <!-- 3-Column Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+            <!-- LEFT COLUMN: Actions & Presets -->
+            <div class="lg:col-span-3 flex flex-col gap-4">
+                <!-- Preset Dropdown -->
+                <div class="relative">
+                    <select id="presetSelect" class="miito-input-box w-full py-2.5 px-4 pr-8 text-gray-600 font-semibold cursor-pointer appearance-none">
+                        <option value="" disabled selected>▶ Select Voice Preset</option>
+                        <option value="young_man">Young Man</option>
+                        <option value="young_woman">Young Woman</option>
+                        <option value="adult_man">Adult Man</option>
+                        <option value="adult_woman">Adult Woman</option>
+                        <option value="old_man">Old Man</option>
+                        <option value="old_woman">Old Woman</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-600">
+                        ▼
+                    </div>
+                </div>
+
+                <!-- Play / Pause Icon Button + Speech Action -->
+                <div class="flex gap-3">
+                    <button id="playPauseBtn" class="miito-btn w-14 h-14 flex items-center justify-center text-2xl" title="Play/Pause Synthesis">
+                        ▶
+                    </button>
+                    <div class="flex-1 text-xs text-gray-500 flex flex-col justify-center">
+                        <span class="font-bold text-gray-700">Status: <span id="synthStatus" class="text-[#019ABE]">Ready</span></span>
+                        <span>Nuance Vocalizer Engine</span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <button id="randomizeBtn" class="miito-btn py-3 text-lg">
+                    Randomize
+                </button>
+
+                <button id="savePresetBtn" class="miito-btn py-3 text-lg">
+                    Save New Preset
+                </button>
+
+                <button id="downloadBtn" class="miito-btn py-3 text-lg">
+                    Download
+                </button>
+
+                <button id="generateBtn" class="miito-btn py-3 text-lg">
+                    Generate Speech
+                </button>
+            </div>
+
+            <!-- MIDDLE COLUMN: Language & Speech Input -->
+            <div class="lg:col-span-5 flex flex-col gap-4">
+                <!-- Voice Header Pill -->
+                <div>
+                    <div class="miito-pill">Voice</div>
+                </div>
+
+                <!-- Language Dropdown Selector -->
+                <div class="relative">
+                    <select id="languageSelect" class="miito-input-box w-full py-3 px-5 pr-10 text-lg font-bold text-gray-700 cursor-pointer appearance-none">
+                        <!-- Populated by JS -->
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-700 font-bold">
+                        ▼
+                    </div>
+                </div>
+
+                <!-- Text Input Header Pill -->
+                <div class="mt-2">
+                    <div class="miito-pill">Text Input</div>
+                </div>
+
+                <!-- Speech Text Area -->
+                <div class="w-full">
+                    <textarea id="textInput" rows="7" class="miito-input-box w-full p-4 text-gray-800 text-lg resize-none" placeholder="Enter text here you want to convert to speech..."></textarea>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Radar Pentagon & Intonation -->
+            <div class="lg:col-span-4 flex flex-col items-center justify-start">
+                
+                <!-- Interactive Radar Chart Canvas -->
+                <div class="relative w-full flex flex-col items-center">
+                    <canvas id="radarCanvas" width="340" height="320" class="max-w-full"></canvas>
+                </div>
+
+                <!-- Intonation Controls Container -->
+                <div class="w-full mt-4 pt-3 border-t border-gray-300 flex flex-col items-center">
+                    <div class="text-gray-500 font-semibold mb-3 self-start pl-4">Intonation</div>
+                    
+                    <div class="flex gap-3 justify-center items-center">
+                        <button class="intonation-btn" data-intonation="1">1</button>
+                        <button class="intonation-btn" data-intonation="2">2</button>
+                        <button class="intonation-btn" data-intonation="3">3</button>
+                        <button class="intonation-btn selected" data-intonation="4">4</button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Simulation Modules Javascript Implementation -->
+    <script>
+        /**
+         * ==========================================
+         * MODULE 1: utils.js
+         * Helpers for audio synthesis, math & geometry
+         * ==========================================
+         */
+        const Utils = {
+            // Converts polar parameters (distance 0-1) to 2D screen coordinates
+            getPointCoordinates(centerX, centerY, radius, angle, valueRatio) {
+                const r = radius * Math.max(0.05, Math.min(1.0, valueRatio));
+                return {
+                    x: centerX + r * Math.sin(angle),
+                    y: centerY - r * Math.cos(angle)
+                };
+            },
+
+            // Computes distance from a point to another point
+            distance(p1, p2) {
+                return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+            },
+
+            // Web Audio API Speech Synthesizer & Fallback Formant Synthesizer
+            async synthesizeSpeech(text, voiceParams, languageCode, onEnd) {
+                if (!text || text.trim() === '') {
+                    alert("Please enter text to synthesize!");
+                    if (onEnd) onEnd();
+                    return;
+                }
+
+                // Prefer Web Speech API if supported for language accurate pronunciation
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // Reset any active speech
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    
+                    // Map radar parameters to SpeechSynthesis parameters
+                    // Pitch: 0 - 100 -> 0.5 to 1.8
+                    utterance.pitch = 0.5 + (voiceParams.pitch / 100) * 1.3;
+                    
+                    // Speed: 0 - 100 -> 0.5 to 1.8
+                    utterance.rate = 0.5 + (voiceParams.speed / 100) * 1.3;
+
+                    // Set matching voice language if available
+                    const voices = window.speechSynthesis.getVoices();
+                    const matchedVoice = voices.find(v => v.lang.toLowerCase().startsWith(languageCode.toLowerCase().substring(0, 2)));
+                    if (matchedVoice) {
+                        utterance.voice = matchedVoice;
+                    }
+                    utterance.lang = languageCode;
+
+                    utterance.onend = () => { if (onEnd) onEnd(); };
+                    utterance.onerror = () => { if (onEnd) onEnd(); };
+
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    // Web Audio Oscillator Fallback
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    const ctx = new AudioCtx();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    const freq = 100 + (voiceParams.pitch * 3);
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                    osc.type = 'sawtooth';
+
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start();
+                    osc.stop(ctx.currentTime + 1.5);
+                    setTimeout(() => { if (onEnd) onEnd(); }, 1500);
+                }
+            }
+        };
+
+        /**
+         * ==========================================
+         * MODULE 2: managevoices.js
+         * Voice endpoints, presets, and language data
+         * ==========================================
+         */
+        const ManageVoices = {
+            baseUrl: "https://github.com/RuporMT12/miitalkmo/tree/3836239ea86e25aa1ea6ffbd672854ba74917688/voicedata",
+            
+            languages: [
+                { id: "englishUS", name: "US English", code: "en-US" },
+                { id: "germanEU", name: "German", code: "de-DE" },
+                { id: "englishEUorAU", name: "Europe/Australia English", code: "en-GB" },
+                { id: "spanishESP", name: "Europe Spanish", code: "es-ES" },
+                { id: "spanishLAT", name: "Latin America Spanish", code: "es-MX" },
+                { id: "frenchCAN", name: "Canada French", code: "fr-CA" },
+                { id: "frenchFR", name: "Europe French", code: "fr-FR" },
+                { id: "italianEU", name: "Italian", code: "it-IT" },
+                { id: "dutchNL", name: "Dutch", code: "nl-NL" },
+                { id: "portuguesePT", name: "Portuguese", code: "pt-PT" },
+                { id: "russianRUS", name: "Russian", code: "ru-RU" },
+                { id: "japaneseJP", name: "Japanese", code: "ja-JP" }
+            ],
+
+            presets: {
+                young_man:   { pitch: 65, depth: 40, energy: 75, accent: 50, speed: 70, intonation: 4 },
+                young_woman: { pitch: 85, depth: 30, energy: 80, accent: 45, speed: 75, intonation: 4 },
+                adult_man:   { pitch: 40, depth: 75, energy: 60, accent: 50, speed: 50, intonation: 3 },
+                adult_woman: { pitch: 70, depth: 55, energy: 65, accent: 50, speed: 55, intonation: 3 },
+                old_man:     { pitch: 25, depth: 90, energy: 35, accent: 60, speed: 35, intonation: 2 },
+                old_woman:   { pitch: 50, depth: 80, energy: 40, accent: 55, speed: 40, intonation: 2 }
+            },
+
+            currentLanguage: "englishUS",
+
+            getLanguageObject(id) {
+                return this.languages.find(l => l.id === id) || this.languages[0];
+            }
+        };
+
+        /**
+         * ==========================================
+         * MODULE 3: savefile.js
+         * Export preset configuration & JSON download
+         * ==========================================
+         */
+        const SaveFile = {
+            exportPreset(presetData, fileName = "miitalkmo_voice_preset.json") {
+                const jsonStr = JSON.stringify(presetData, null, 2);
+                const blob = new Blob([jsonStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            },
+
+            downloadAudio(text, params, langCode) {
+                // Generates downloadable Voice parameters manifest/audio metadata
+                const audioManifest = {
+                    engine: "Nuance Vocalizer (22kHz VocS Mobile)",
+                    language: langCode,
+                    text: text,
+                    parameters: params,
+                    timestamp: new Date().toISOString()
+                };
+                this.exportPreset(audioManifest, "miitalkmo_speech_config.json");
+            }
+        };
+
+        /**
+         * ==========================================
+         * MODULE 4: script.js
+         * Main UI & Pentagon Radar Handler
+         * ==========================================
+         */
+        class MiitalkmoApp {
+            constructor() {
+                // Radar values (0 - 100)
+                this.params = {
+                    pitch: 65,
+                    depth: 60,
+                    energy: 55,
+                    accent: 40,
+                    speed: 50
+                };
+                this.intonation = 4;
+                this.isPlaying = false;
+
+                // Radar Canvas setup
+                this.canvas = document.getElementById("radarCanvas");
+                this.ctx = this.canvas.getContext("2d");
+                this.centerX = 170;
+                this.centerY = 160;
+                this.radius = 95;
+
+                // 5 Axis definition: Pitch (Top), Depth (Top Right), Energy (Bottom Right), Accent (Bottom Left), Speed (Top Left)
+                this.axes = [
+                    { key: "pitch", label: "Pitch", angle: 0 },
+                    { key: "depth", label: "Depth", angle: (2 * Math.PI) / 5 },
+                    { key: "energy", label: "Energy", angle: (4 * Math.PI) / 5 },
+                    { key: "accent", label: "Accent", angle: (6 * Math.PI) / 5 },
+                    { key: "speed", label: "Speed", angle: (8 * Math.PI) / 5 }
+                ];
+
+                this.draggedAxisIndex = -1;
+
+                this.initUI();
+                this.initEvents();
+                this.drawRadar();
+            }
+
+            initUI() {
+                // Populate languages
+                const langSelect = document.getElementById("languageSelect");
+                langSelect.innerHTML = "";
+                ManageVoices.languages.forEach(lang => {
+                    const opt = document.createElement("option");
+                    opt.value = lang.id;
+                    opt.textContent = `▶ ${lang.name}`;
+                    langSelect.appendChild(opt);
+                });
+                document.getElementById("langCount").textContent = ManageVoices.languages.length;
+            }
+
+            initEvents() {
+                // Language Select
+                document.getElementById("languageSelect").addEventListener("change", (e) => {
+                    ManageVoices.currentLanguage = e.target.value;
+                });
+
+                // Preset Select
+                document.getElementById("presetSelect").addEventListener("change", (e) => {
+                    const preset = ManageVoices.presets[e.target.value];
+                    if (preset) {
+                        this.params.pitch = preset.pitch;
+                        this.params.depth = preset.depth;
+                        this.params.energy = preset.energy;
+                        this.params.accent = preset.accent;
+                        this.params.speed = preset.speed;
+                        this.setIntonation(preset.intonation);
+                        this.drawRadar();
+                    }
+                });
+
+                // Intonation Buttons
+                document.querySelectorAll(".intonation-btn").forEach(btn => {
+                    btn.addEventListener("click", () => {
+                        const val = parseInt(btn.getAttribute("data-intonation"));
+                        this.setIntonation(val);
+                    });
+                });
+
+                // Action Buttons
+                document.getElementById("randomizeBtn").addEventListener("click", () => this.randomize());
+                document.getElementById("generateBtn").addEventListener("click", () => this.speak());
+                document.getElementById("playPauseBtn").addEventListener("click", () => this.togglePlay()
